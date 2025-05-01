@@ -1,0 +1,167 @@
+package main
+
+import (
+	"bytes"
+	"image"
+	"image/color"
+	"log"
+	"math/rand/v2"
+	"path/filepath"
+
+	"github.com/hajimehoshi/ebiten/v2"
+	"github.com/hajimehoshi/ebiten/v2/ebitenutil"
+)
+
+var (
+	BACKGROUND_BG_COLOR = color.RGBA{0x10, 0x10, 0xef, 0xff}
+	BACKGROUND_Y_MAX    = (int)(WINDOW_HEIGHT * 1.5)
+	BACKGROUND_Y_HALF   = (int)(WINDOW_HEIGHT * 0.5)
+)
+
+const (
+	BACKGROUND_CLOUD_OFFSET_MAX = WINDOW_WIDTH / 2
+)
+
+type Sprite struct {
+	image               *ebiten.Image
+	x, y, width, height int
+}
+
+type Background struct {
+	game                                  *Game
+	imageClouds, imageOcean               *ebiten.Image
+	imageCloud1, imageCloud2, imageCloud3 *ebiten.Image
+	imageC                                string
+	imageW                                string
+	backgroundHeight                      int
+	backgroundHeightHalf                  int
+	backgroundStart                       int
+	backgroundStartC                      int
+	backgroundEnd                         int
+	backgroundEndC                        int
+	backgroundY1                          int
+	backgroundY2                          int
+	backgroundYC                          int
+	backgroundX                           int
+	cloudX                                int
+	cloudSpeed                            int
+
+	Movable
+}
+
+func NewBackground(g *Game) *Background {
+	c := &Background{}
+	c.game = g
+	c.imageC = "clouds.png"
+	c.imageW = "oceanBlank.png"
+	c.cloudSpeed = 2
+	c.initImagesClouds()
+	c.initImagesB()
+	c.backgroundY1 = c.backgroundStart
+	c.backgroundY2 = 0
+	c.backgroundYC = 0
+	return c
+}
+
+func (c *Background) initImagesF() {
+	var err error
+	path := filepath.Join(c.game.imageSubdir, c.imageC)
+	img, _, err := ebitenutil.NewImageFromFile(path)
+	if err != nil {
+		log.Fatal(err)
+	}
+	c.imageClouds = img
+	c.backgroundStartC = -c.imageClouds.Bounds().Dy()
+	c.backgroundEndC = c.imageClouds.Bounds().Dy()
+
+	path = filepath.Join(c.game.imageSubdir, c.imageW)
+	img, _, err = ebitenutil.NewImageFromFile(path)
+	if err != nil {
+		log.Fatal(err)
+	}
+	c.imageOcean = CropImage(img, WINDOW_WIDTH, WINDOW_HEIGHT)
+
+	c.backgroundHeight = c.imageOcean.Bounds().Dy()
+
+	c.backgroundHeightHalf = c.backgroundHeight / 2
+	c.backgroundStart = -c.backgroundHeight
+	c.backgroundEnd = c.backgroundHeight
+}
+
+func (c *Background) initImagesClouds() {
+	var err error
+	// get sprite sheet from bytes array
+	img, _, err := image.Decode(bytes.NewReader(ImageClouds2))
+	if err != nil {
+		log.Fatal(err)
+	}
+	// convert image to ebiten image format
+	imageClouds2 := ebiten.NewImageFromImage(img)
+	c.imageCloud1 = SubImage(imageClouds2, 0, 0, 100, 100)
+	c.imageCloud2 = SubImage(imageClouds2, 100, 0, 100, 100)
+	c.imageCloud3 = SubImage(imageClouds2, 0, 100, 200, 100)
+
+}
+
+func (c *Background) initImagesB() {
+	var err error
+	// get sprite sheet from bytes array
+	img, _, err := image.Decode(bytes.NewReader(ImageClouds))
+	if err != nil {
+		log.Fatal(err)
+	}
+	// convert image to ebiten image format
+	c.imageClouds = ebiten.NewImageFromImage(img)
+
+	c.backgroundStartC = -c.imageClouds.Bounds().Dy()
+	c.backgroundEndC = c.imageClouds.Bounds().Dy()
+
+	img, _, err = image.Decode(bytes.NewReader(ImageOcean))
+	if err != nil {
+		log.Fatal(err)
+	}
+	// convert image to ebiten image format
+	c.imageOcean = ebiten.NewImageFromImage(img)
+
+	c.imageOcean = CropImage(c.imageOcean, WINDOW_WIDTH, WINDOW_HEIGHT)
+
+	c.backgroundHeight = c.imageOcean.Bounds().Dy()
+
+	c.backgroundHeightHalf = c.backgroundHeight / 2
+	c.backgroundStart = -c.backgroundHeight
+	c.backgroundEnd = c.backgroundHeight
+}
+
+func (c *Background) Draw(screen *ebiten.Image) {
+	screen.Fill(BACKGROUND_BG_COLOR)
+	DrawImageAt(c.imageOcean, screen, 0, 0)
+	DrawImageAt(c.imageOcean, screen, 0, c.backgroundY1)
+	DrawImageAt(c.imageOcean, screen, 0, c.backgroundY2)
+
+	DrawImageAt(c.imageClouds, screen, c.cloudX, c.backgroundYC)
+
+}
+
+func (c *Background) Update() error {
+	var err error
+	if c.backgroundY1 > c.backgroundEnd {
+		c.backgroundY1 = c.backgroundStart
+	} else {
+		c.backgroundY1 += 1
+	}
+
+	if c.backgroundY2 > c.backgroundEnd {
+		c.backgroundY2 = c.backgroundStart
+	} else {
+		c.backgroundY2 += 1
+	}
+
+	if c.backgroundYC > c.backgroundEndC {
+		c.backgroundYC = c.backgroundStartC
+		c.cloudX = rand.IntN(BACKGROUND_CLOUD_OFFSET_MAX)
+	} else {
+		c.backgroundYC += c.cloudSpeed
+	}
+
+	return err
+}
